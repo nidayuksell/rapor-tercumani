@@ -51,16 +51,18 @@ export default function Home() {
   const [howOpen, setHowOpen] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
-  const pdfInputRef = useRef<HTMLInputElement>(null);
   const [ocrLoading, setOcrLoading] = useState(false);
   const [ocrError, setOcrError] = useState<string | null>(null);
-  const imageInputRef = useRef<HTMLInputElement>(null);
-  /** Mobile / touch: open camera; desktop: file picker only */
-  const [imageInputUseCapture, setImageInputUseCapture] = useState(false);
+  /** Camera: capture="environment" + image/* only */
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  /** Gallery / desktop: images + PDF, no capture */
+  const filePickerInputRef = useRef<HTMLInputElement>(null);
+  /** True ≈ phone/tablet touch — show camera + gallery buttons */
+  const [isCoarsePointer, setIsCoarsePointer] = useState(false);
 
   useEffect(() => {
     const mq = window.matchMedia("(pointer: coarse)");
-    const apply = () => setImageInputUseCapture(mq.matches);
+    const apply = () => setIsCoarsePointer(mq.matches);
     apply();
     mq.addEventListener("change", apply);
     return () => mq.removeEventListener("change", apply);
@@ -109,22 +111,36 @@ export default function Home() {
     }
   }
 
-  async function handlePdfSelected(e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
+  function isPdfFile(file: File): boolean {
+    const n = file.name.toLowerCase();
+    const mime = file.type;
+    return (
+      n.endsWith(".pdf") ||
+      mime === "application/pdf" ||
+      mime === "application/x-pdf" ||
+      (mime === "application/octet-stream" && n.endsWith(".pdf"))
+    );
+  }
 
-    const isPdfName = file.name.toLowerCase().endsWith(".pdf");
-    const isPdfMime =
-      !file.type ||
-      file.type === "application/pdf" ||
-      file.type === "application/x-pdf" ||
-      file.type === "application/octet-stream";
-    if (!isPdfName || !isPdfMime) {
+  function isOcrImageFile(file: File): boolean {
+    const ext = file.name.toLowerCase();
+    if (file.type.startsWith("image/")) {
+      if (file.type === "image/svg+xml") return false;
+      return true;
+    }
+    return (
+      ext.endsWith(".jpg") ||
+      ext.endsWith(".jpeg") ||
+      ext.endsWith(".png") ||
+      ext.endsWith(".webp")
+    );
+  }
+
+  async function runPdfUpload(file: File) {
+    if (!isPdfFile(file)) {
       setPdfError(PDF_READ_FAIL);
       return;
     }
-
     setPdfError(null);
     setError(null);
     setPdfLoading(true);
@@ -142,44 +158,22 @@ export default function Home() {
     }
   }
 
-  async function handleImageSelected(e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-
-    const ext = file.name.toLowerCase();
-    const okExt =
-      ext === "" ||
-      ext.endsWith(".jpg") ||
-      ext.endsWith(".jpeg") ||
-      ext.endsWith(".png") ||
-      ext.endsWith(".webp");
-    const okMime =
-      file.type === "image/jpeg" ||
-      file.type === "image/png" ||
-      file.type === "image/webp" ||
-      file.type === "";
-    if (!okExt || !okMime || (ext === "" && file.type === "")) {
+  async function runImageOcr(file: File) {
+    if (!isOcrImageFile(file)) {
       setOcrError(OCR_READ_FAIL);
       return;
     }
-
     if (file.size > 3 * 1024 * 1024) {
       setOcrError(OCR_READ_FAIL);
       return;
     }
-
     setOcrError(null);
     setError(null);
     setOcrLoading(true);
     try {
       const fd = new FormData();
       fd.append("image", file);
-
-      const res = await fetch("/api/ocr", {
-        method: "POST",
-        body: fd,
-      });
+      const res = await fetch("/api/ocr", { method: "POST", body: fd });
       const data = (await res.json()) as { text?: string; error?: string };
       if (!res.ok || !data.text?.trim()) {
         setOcrError(OCR_READ_FAIL);
@@ -190,6 +184,30 @@ export default function Home() {
       setOcrError(OCR_READ_FAIL);
     } finally {
       setOcrLoading(false);
+    }
+  }
+
+  async function handleCameraInputChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    setError(null);
+    if (!file) return;
+    await runImageOcr(file);
+  }
+
+  async function handleFilePickerChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    setError(null);
+    if (!file) return;
+    if (isPdfFile(file)) {
+      await runPdfUpload(file);
+    } else if (isOcrImageFile(file)) {
+      await runImageOcr(file);
+    } else {
+      setPdfError(null);
+      setOcrError(null);
+      setError("Yalnızca görsel (JPG, PNG, WEBP) veya PDF yükleyebilirsiniz.");
     }
   }
 
@@ -388,36 +406,49 @@ export default function Home() {
 
               <div className="flex shrink-0 flex-col gap-2 sm:w-48 sm:pt-1">
                 <input
-                  ref={pdfInputRef}
+                  ref={cameraInputRef}
                   type="file"
-                  accept=".pdf,application/pdf"
+                  accept="image/*"
+                  capture="environment"
                   className="hidden"
-                  onChange={handlePdfSelected}
+                  onChange={handleCameraInputChange}
                 />
                 <input
-                  ref={imageInputRef}
+                  ref={filePickerInputRef}
                   type="file"
-                  accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+                  accept="image/*,.pdf,.jpg,.jpeg,.png,.webp,application/pdf"
                   className="hidden"
-                  onChange={handleImageSelected}
-                  {...(imageInputUseCapture ? { capture: "environment" as const } : {})}
+                  onChange={handleFilePickerChange}
                 />
-                <button
-                  type="button"
-                  disabled={pdfLoading || ocrLoading || loading}
-                  onClick={() => pdfInputRef.current?.click()}
-                  className="rounded-2xl border-2 border-[#1B3A6B] bg-white px-4 py-3 text-sm font-bold text-[#1B3A6B] shadow-clinical-card transition hover:bg-[#1B3A6B]/5 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  PDF Yükle
-                </button>
-                <button
-                  type="button"
-                  disabled={pdfLoading || ocrLoading || loading}
-                  onClick={() => imageInputRef.current?.click()}
-                  className="rounded-2xl border-2 border-[#1B3A6B] bg-white px-4 py-3 text-sm font-bold leading-snug text-[#1B3A6B] shadow-clinical-card transition hover:bg-[#1B3A6B]/5 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Fotoğraf Çek / Görsel Yükle
-                </button>
+                {isCoarsePointer ? (
+                  <>
+                    <button
+                      type="button"
+                      disabled={pdfLoading || ocrLoading || loading}
+                      onClick={() => cameraInputRef.current?.click()}
+                      className="rounded-2xl border-2 border-[#1B3A6B] bg-white px-4 py-3 text-sm font-bold text-[#1B3A6B] shadow-clinical-card transition hover:bg-[#1B3A6B]/5 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      📷 Fotoğraf Çek
+                    </button>
+                    <button
+                      type="button"
+                      disabled={pdfLoading || ocrLoading || loading}
+                      onClick={() => filePickerInputRef.current?.click()}
+                      className="rounded-2xl border-2 border-[#1B3A6B] bg-white px-4 py-3 text-sm font-bold leading-snug text-[#1B3A6B] shadow-clinical-card transition hover:bg-[#1B3A6B]/5 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      🖼️ Galeriden / Dosyadan Seç
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={pdfLoading || ocrLoading || loading}
+                    onClick={() => filePickerInputRef.current?.click()}
+                    className="rounded-2xl border-2 border-[#1B3A6B] bg-white px-4 py-3 text-sm font-bold leading-snug text-[#1B3A6B] shadow-clinical-card transition hover:bg-[#1B3A6B]/5 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Görsel veya PDF Yükle
+                  </button>
+                )}
                 {(pdfLoading || ocrLoading) && (
                   <p className="text-center text-sm font-medium text-zinc-600 sm:text-left">
                     {pdfLoading ? "PDF okunuyor..." : "Rapor okunuyor..."}
