@@ -8,7 +8,19 @@ import { AppFooter } from "@/components/AppFooter";
 import { BrandLockup } from "@/components/BrandLogo";
 import { LandingHero } from "@/components/LandingHero";
 import { SelectionCard } from "@/components/SelectionCard";
-import type { AnalysisResult, ReaderMode, ReportSource, ReportType, UserSelections } from "@/lib/types";
+import {
+  EMPTY_PATIENT_PROFILE,
+  type AgeRange,
+  type AnalysisResult,
+  type FastingStatus,
+  type Gender,
+  type PatientProfile,
+  type PregnancyStatus,
+  type ReaderMode,
+  type ReportSource,
+  type ReportType,
+  type UserSelections,
+} from "@/lib/types";
 
 type Step = "landing" | "setup" | "input" | "result";
 
@@ -34,6 +46,29 @@ const READER_OPTIONS: { value: ReaderMode; label: string; hint: string }[] = [
   },
 ];
 
+const AGE_OPTIONS: { value: AgeRange; label: string }[] = [
+  { value: "0-17", label: "0-17 (Çocuk)" },
+  { value: "18-35", label: "18-35" },
+  { value: "36-55", label: "36-55" },
+  { value: "55+", label: "55+" },
+];
+
+const GENDER_OPTIONS: { value: Gender; label: string }[] = [
+  { value: "kadin", label: "Kadın" },
+  { value: "erkek", label: "Erkek" },
+];
+
+const PREGNANCY_OPTIONS: { value: PregnancyStatus; label: string }[] = [
+  { value: "gebe-degil", label: "Gebe değilim" },
+  { value: "gebe", label: "Gebeyim" },
+];
+
+const FASTING_OPTIONS: { value: FastingStatus; label: string }[] = [
+  { value: "ac", label: "Aç karnına yapıldı" },
+  { value: "tok", label: "Tok karnına yapıldı" },
+  { value: "bilinmiyor", label: "Bilmiyorum" },
+];
+
 const PDF_READ_FAIL = "PDF okunamadı, metni manuel olarak yapıştırabilirsiniz.";
 const OCR_READ_FAIL = "Görsel okunamadı, metni manuel yapıştırabilirsiniz.";
 
@@ -43,6 +78,7 @@ export default function Home() {
     source: null,
     type: null,
     reader: null,
+    profile: { ...EMPTY_PATIENT_PROFILE },
   });
   const [reportText, setReportText] = useState("");
   const [loading, setLoading] = useState(false);
@@ -68,12 +104,31 @@ export default function Home() {
     return () => mq.removeEventListener("change", apply);
   }, []);
 
-  const selectionsComplete = useMemo(
-    () => Boolean(selections.source && selections.type && selections.reader),
-    [selections],
-  );
+  const selectionsComplete = useMemo(() => {
+    const { source, type, reader, profile } = selections;
+    if (!source || !type || !reader) return false;
+    if (!profile.ageRange || !profile.gender) return false;
+    if (profile.gender === "kadin" && !profile.pregnancy) return false;
+    if (type === "kan" && !profile.fasting) return false;
+    return true;
+  }, [selections]);
+
+  function profilePayload(): PatientProfile {
+    const p = selections.profile;
+    return {
+      ageRange: p.ageRange,
+      gender: p.gender,
+      pregnancy: selections.profile.gender === "kadin" ? p.pregnancy : null,
+      fasting: selections.type === "kan" ? p.fasting : null,
+      chronicConditions: p.chronicConditions.trim(),
+    };
+  }
 
   async function analyze() {
+    if (!selectionsComplete) {
+      setError("Lütfen tüm zorunlu seçimleri ve hasta profilini tamamlayın.");
+      return;
+    }
     if (!selections.source || !selections.type || !selections.reader) {
       setError("Lütfen tüm kartları seçin.");
       return;
@@ -93,6 +148,7 @@ export default function Home() {
           source: selections.source,
           type: selections.type,
           reader: selections.reader,
+          profile: profilePayload(),
         }),
       });
       const data = (await res.json()) as { result?: AnalysisResult; error?: string };
@@ -223,7 +279,12 @@ export default function Home() {
                 setStep("landing");
                 setResult(null);
                 setReportText("");
-                setSelections({ source: null, type: null, reader: null });
+                setSelections({
+                  source: null,
+                  type: null,
+                  reader: null,
+                  profile: { ...EMPTY_PATIENT_PROFILE },
+                });
                 setError(null);
                 setPdfError(null);
                 setOcrError(null);
@@ -279,7 +340,7 @@ export default function Home() {
             {howOpen && (
               <div className="mx-auto max-w-lg rounded-2xl border border-zinc-100 bg-zinc-50/90 p-5 text-left text-sm leading-relaxed text-zinc-700 shadow-clinical-card">
                 <ol className="list-decimal space-y-2 pl-5">
-                  <li>Kaynak, rapor türü ve kim için okuduğunuzu seçin.</li>
+                  <li>Kaynak, rapor türü, okuyucu modu ve sizin hakkınızda bilgileri seçin.</li>
                   <li>Rapor metnini yapıştırıp analizi başlatın.</li>
                   <li>
                     Aciliyet skoru ve sade Türkçe özet görünür. Son karar her zaman hekiminizedir.
@@ -337,7 +398,16 @@ export default function Home() {
                     <SelectionCard
                       key={opt.value}
                       active={active}
-                      onClick={() => setSelections((s) => ({ ...s, type: opt.value }))}
+                      onClick={() =>
+                        setSelections((s) => ({
+                          ...s,
+                          type: opt.value,
+                          profile: {
+                            ...s.profile,
+                            fasting: opt.value === "kan" ? s.profile.fasting : null,
+                          },
+                        }))
+                      }
                     >
                       <p className="text-2xl leading-none">{opt.emoji}</p>
                       <p className="mt-2 text-sm font-bold text-zinc-900">{opt.label}</p>
@@ -365,6 +435,140 @@ export default function Home() {
                     </SelectionCard>
                   );
                 })}
+              </div>
+            </section>
+
+            <section className="space-y-4">
+              <h3 className="text-sm font-bold uppercase tracking-wide text-[#1B3A6B]">
+                👤 Sizin Hakkınızda
+              </h3>
+              <p className="text-xs leading-relaxed text-zinc-600">
+                Referans aralığı yorumunu doğrulamak için kullanılır; isteğe bağlı alanlar açıkça
+                işaretlidir.
+              </p>
+
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-zinc-700">Yaş aralığı</p>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  {AGE_OPTIONS.map((opt) => {
+                    const active = selections.profile.ageRange === opt.value;
+                    return (
+                      <SelectionCard
+                        key={opt.value}
+                        active={active}
+                        onClick={() =>
+                          setSelections((s) => ({
+                            ...s,
+                            profile: { ...s.profile, ageRange: opt.value },
+                          }))
+                        }
+                      >
+                        <p className="text-sm font-bold text-zinc-900">{opt.label}</p>
+                      </SelectionCard>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-zinc-700">Cinsiyet</p>
+                <div className="grid grid-cols-2 gap-3">
+                  {GENDER_OPTIONS.map((opt) => {
+                    const active = selections.profile.gender === opt.value;
+                    return (
+                      <SelectionCard
+                        key={opt.value}
+                        active={active}
+                        onClick={() =>
+                          setSelections((s) => ({
+                            ...s,
+                            profile: {
+                              ...s.profile,
+                              gender: opt.value,
+                              pregnancy: opt.value === "erkek" ? null : s.profile.pregnancy,
+                            },
+                          }))
+                        }
+                      >
+                        <p className="font-bold text-zinc-900">{opt.label}</p>
+                      </SelectionCard>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {selections.profile.gender === "kadin" && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-zinc-700">Gebelik</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {PREGNANCY_OPTIONS.map((opt) => {
+                      const active = selections.profile.pregnancy === opt.value;
+                      return (
+                        <SelectionCard
+                          key={opt.value}
+                          active={active}
+                          onClick={() =>
+                            setSelections((s) => ({
+                              ...s,
+                              profile: { ...s.profile, pregnancy: opt.value },
+                            }))
+                          }
+                        >
+                          <p className="font-bold text-zinc-900">{opt.label}</p>
+                        </SelectionCard>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {selections.type === "kan" && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-zinc-700">Tahlil açlık durumu</p>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    {FASTING_OPTIONS.map((opt) => {
+                      const active = selections.profile.fasting === opt.value;
+                      return (
+                        <SelectionCard
+                          key={opt.value}
+                          active={active}
+                          onClick={() =>
+                            setSelections((s) => ({
+                              ...s,
+                              profile: { ...s.profile, fasting: opt.value },
+                            }))
+                          }
+                        >
+                          <p className="text-sm font-bold text-zinc-900">{opt.label}</p>
+                        </SelectionCard>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <label
+                  htmlFor="chronic-conditions"
+                  className="text-xs font-semibold text-zinc-700"
+                >
+                  Bilinen kronik hastalığınız varsa yazın{" "}
+                  <span className="font-normal text-zinc-500">(opsiyonel)</span>
+                </label>
+                <input
+                  id="chronic-conditions"
+                  type="text"
+                  value={selections.profile.chronicConditions}
+                  onChange={(e) =>
+                    setSelections((s) => ({
+                      ...s,
+                      profile: { ...s.profile, chronicConditions: e.target.value },
+                    }))
+                  }
+                  placeholder="Örn: Tip 2 diyabet, hipertansiyon, hipotiroidi..."
+                  className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 shadow-sm placeholder:text-zinc-400 focus:border-[#1B3A6B] focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]/20"
+                  autoComplete="off"
+                />
               </div>
             </section>
 

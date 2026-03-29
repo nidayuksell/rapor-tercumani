@@ -2,6 +2,29 @@ export type ReportSource = "e-nabiz" | "ozel" | "yurtdisi";
 export type ReportType = "kan" | "goruntuleme" | "recete" | "epikriz";
 export type ReaderMode = "self" | "relative";
 
+/** Hasta profili — referans yorumu için */
+export type AgeRange = "0-17" | "18-35" | "36-55" | "55+";
+export type Gender = "kadin" | "erkek";
+export type PregnancyStatus = "gebe-degil" | "gebe";
+/** Kan tahlili için; yalnızca rapor türü kan iken anlamlı */
+export type FastingStatus = "ac" | "tok" | "bilinmiyor";
+
+export type PatientProfile = {
+  ageRange: AgeRange | null;
+  gender: Gender | null;
+  pregnancy: PregnancyStatus | null;
+  fasting: FastingStatus | null;
+  chronicConditions: string;
+};
+
+export const EMPTY_PATIENT_PROFILE: PatientProfile = {
+  ageRange: null,
+  gender: null,
+  pregnancy: null,
+  fasting: null,
+  chronicConditions: "",
+};
+
 export type UrgencyLevel = "green" | "yellow" | "red";
 
 export type AbnormalDirection = "high" | "low";
@@ -22,6 +45,7 @@ export type UserSelections = {
   source: ReportSource | null;
   type: ReportType | null;
   reader: ReaderMode | null;
+  profile: PatientProfile;
 };
 
 export type BirimDonusumSatir = {

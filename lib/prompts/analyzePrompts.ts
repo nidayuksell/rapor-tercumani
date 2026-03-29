@@ -1,4 +1,4 @@
-import type { ReaderMode, ReportSource, ReportType } from "@/lib/types";
+import type { PatientProfile, ReaderMode, ReportSource, ReportType } from "@/lib/types";
 
 const SOURCE_LABELS: Record<ReportSource, string> = {
   "e-nabiz": "e-Nabız / SGK",
@@ -64,10 +64,82 @@ function kaynakEkleriFillGuide(source: ReportSource, reportType: ReportType): st
 const BASE = `YANIT: Tek JSON nesnesi. Markdown yok.
 KESİNLİKLE YASAK: Kesin teşhis, ilaç/doz emri. Olasılık dili kullan.`;
 
+function formatPatientProfileForPrompt(profile: PatientProfile, reportType: ReportType): string {
+  const ageLabels: Record<NonNullable<PatientProfile["ageRange"]>, string> = {
+    "0-17": "0-17 (Çocuk)",
+    "18-35": "18-35",
+    "36-55": "36-55",
+    "55+": "55+",
+  };
+  const age = profile.ageRange ? ageLabels[profile.ageRange] : "—";
+  const genderTr =
+    profile.gender === "kadin" ? "Kadın" : profile.gender === "erkek" ? "Erkek" : "—";
+  let pregnancyTr = "Uygulanmaz (cinsiyet erkek veya seçilmedi)";
+  if (profile.gender === "kadin") {
+    pregnancyTr =
+      profile.pregnancy === "gebe"
+        ? "Gebeyim"
+        : profile.pregnancy === "gebe-degil"
+          ? "Gebe değilim"
+          : "—";
+  }
+  let fastingTr = "Uygulanmaz (kan tahlili seçilmedi)";
+  if (reportType === "kan") {
+    fastingTr =
+      profile.fasting === "ac"
+        ? "Aç karnına yapıldı"
+        : profile.fasting === "tok"
+          ? "Tok karnına yapıldı"
+          : profile.fasting === "bilinmiyor"
+            ? "Bilmiyorum"
+            : "—";
+  }
+  const chronic = profile.chronicConditions.trim() || "Yok belirtildi";
+
+  return `HASTA PROFİLİ (zorunlu bağlam — tüm yorumu buna göre ayarla):
+Yaş aralığı: ${age}. Cinsiyet: ${genderTr}. Gebelik: ${pregnancyTr}. Açlık durumu (kan tahlili için): ${fastingTr}. Kronik hastalık / ilaç notu: ${chronic}.
+
+Patient profile (machine-readable): Age range: ${profile.ageRange ?? "—"}, Gender: ${genderTr}, Pregnancy: ${pregnancyTr}, Fasting status: ${fastingTr}, Chronic conditions: ${chronic}`;
+}
+
+function patientProfileRulesKan(): string {
+  return `KAN TAHLİLİ — HASTA PROFİLİ İLE YORUM:
+1) Referans aralığı raporda yazıyorsa ÖNCELİK o aralıktır; rapordaki min-max ile karşılaştır.
+2) Referans aralığı raporda YOK veya belirsizse: yaş aralığı, cinsiyet, gebelik (kadınlarda), açlık durumu ve kronik hastalıklara göre genel tıbbi standartları kullan.
+3) Genel standart kullandığın her durumda neAnlamaGeliyor metnine veya ona bitişik şekilde ŞU CÜMLEYİ ekle (tam metin): "⚠️ Bu değer için raporunuzda referans aralığı belirtilmemiş — genel tıbbi standartlara ve yaş/cinsiyet bilginize göre değerlendirildi." (Birden fazla değer etkileniyorsa cümleyi bir kez kullanmak yeterli.)
+4) Kronik hastalık belirtilmişse: ilgili parametreleri ona göre yorumla (ör. diyabet → HbA1c/glikoz; böbrek hastalığı → kreatinin/üre; tiroid → TSH vb.).
+5) Gebelik: kadın ve gebe ise gebelikte değişen referansları dikkate al.
+6) Açlık: aç karnına lipid/glikoz gibi tetkiklerde bağlamı belirt; tok karnına ise buna göre yorumla.`;
+}
+
+function patientProfileRulesGeneral(): string {
+  return `HASTA PROFİLİ: Yaş, cinsiyet, gebelik ve kronik hastalıkları özet ve risk bağlamında dikkate al (uygunsa).`;
+}
+
+function kanAbnormalRules(): string {
+  return `KAN TAHLİLİ — ANORMAL DEĞERLER (KRİTİK, MUTLAKA UYGULA):
+- Rapordaki referans dışı TÜM değerleri analiz et: hem YÜKSEK (↑, üst sınır üstü, "yüksek", "pozitif", vb.) hem DÜŞÜK (↓, alt sınır altı, "düşük", vb.).
+- Sadece düşük değerlere odaklanma; yüksek ve düşük eşit önceliklidir. Bir yönü ihmal etme.
+- neDiyor.satirlar: her anormal satırda durum "yuksek" veya "dusuk" rapora göre DOĞRU atanmalı (her iki yön).
+- degerlerNeDemek: hem yuksek hem dusuk için anormal olan her parametre için madde üret.
+- Özet ve aciliyet: hem yüksek hem düşük anormallikleri skorlamada dikkate al.`;
+}
+
+function goruntulemeSpecificRules(): string {
+  return `MR / RADYOLOJİ / GÖRÜNTÜLEME — DERİNLEMESİNE ANALİZ (GENEL "DOKTORA GİDİN" YETMEZ):
+- neBulundu: Her bulgu için Türkçe, somut ve anlaşılır ifade kullan (ör. "boyun fıtığına işaret eden disk protrüzyonu", "disk yüksekliği kaybı", "sinir kökü baskısı" gibi raporda ne varsa onu adlandır). Latince/İngilizce kısaltma bırakma; sade Türkçe açıkla.
+- Raporda spesifik tanı veya bulgu adı geçiyorsa: o tanının günlük hayatta ne anlama geldiğini 1-2 cümleyle açıkla (kesin teşhis koymadan, olasılık diliyle).
+- gunlukHayat: O bulgunun tipik olarak neden olabileceği günlük belirtileri yaz (ör. ağrı, uyuşma, karıncalanma, hareket kısıtlılığı, baş dönmesi — rapora uygun).
+- takipOnerisi ve onemliMi: "Hekime başvurun" demek yetmez; hangi uzmanlık dalının değerlendirmesi gerektiğini somut yaz (ör. beyin-beyin cerrahisi/nöroloji, ortopedi, fizik tedavi ve rehabilitasyon, göğüs hastalıkları, üroloji — bulguya göre).
+- doktoraSorun: Üç soru da bulguya ÖZEL olmalı; "değerlerim normal mi?" gibi genel sorular YASAK. Örnek üslup: "Boyun fıtığı mı var, ameliyat mı gerekir yoksa fizik tedavi yeterli olur mu?" / "Bu disk kaybı ilerleyici mi, takip aralığı ne olmalı?" — rapordaki bulguya göre uyarla.
+- Aciliyet: genel uyarı yerine bulguya dayalı gerekçe kullan.`;
+}
+
 export function buildAnalyzeSystemPrompt(
   reportType: ReportType,
   source: ReportSource,
   reader: ReaderMode,
+  profile: PatientProfile,
 ): string {
   const sourceLabel = SOURCE_LABELS[source];
   const typeLabel = TYPE_LABELS[reportType];
@@ -75,12 +147,19 @@ export function buildAnalyzeSystemPrompt(
   const yk = yakinBlock(reader);
   const srcCtx = sourceSystemContext(source);
   const keGuide = kaynakEkleriFillGuide(source, reportType);
+  const patientBlock = formatPatientProfileForPrompt(profile, reportType);
+  const profileRulesKan = patientProfileRulesKan();
+  const profileRulesGen = patientProfileRulesGeneral();
 
   if (reportType === "kan") {
     return `Sen tıbbi iletişim asistanısın.
 ${BASE}
 ${ctx}
 ${srcCtx}
+${patientBlock}
+
+${profileRulesKan}
+${kanAbnormalRules()}
 ${keGuide}
 
 ŞEMA (tam anahtarlar):
@@ -96,11 +175,12 @@ ${KAYNAK_EKLERI_KEYS}
 }
 
 neDiyor.satirlar: Sadece referans dışı / anormal. Normal satır ekleme. deger: kısaltma + parantezli Türkçe.
+YÜKSEK ve DÜŞÜK anormalliklerin TAMAMINI dahil et (yukarı ok ve aşağı ok).
 neDiyor.ozet: Tek cümle sayı ile (örn. "5 değeriniz referans aralığı dışında.").
-neAnlamaGeliyor: 2-3 cümle büyük resim; tek tek değer listeleme YOK.
-degerlerNeDemek: Her anormal için; tekCumle en fazla 1 cümle (tanım).
-doktoraSorun: Tablo/pattern odaklı; "MCH düşük ne demek" gibi tek parametre sorma.
-urgency: Hafif sapma → green.
+neAnlamaGeliyor: 2-4 cümle büyük resim; tek tek değer listeleme YOK; gerekirse referans uyarı cümlesini buraya veya sonuna ekle.
+degerlerNeDemek: Her anormal için (hem yuksek hem dusuk); tekCumle en fazla 1 cümle (tanım).
+doktoraSorun: Profil ve tabloya özgü somut sorular; genel "normal mi" sorma.
+urgency: Hem yüksek hem düşük ciddi anormallikleri dikkate al.
 
 ${yk}`;
   }
@@ -110,6 +190,8 @@ ${yk}`;
 ${BASE}
 ${ctx}
 ${srcCtx}
+${patientBlock}
+${profileRulesGen}
 ${keGuide}
 
 ŞEMA:
@@ -138,6 +220,9 @@ ${yk}`;
 ${BASE}
 ${ctx}
 ${srcCtx}
+${patientBlock}
+${profileRulesGen}
+${goruntulemeSpecificRules()}
 ${keGuide}
 
 ŞEMA:
@@ -150,8 +235,8 @@ ${keGuide}
     "gozetim": {"maddeler":[],"aciklama":"tek satır"},
     "normal": {"maddeler":[],"aciklama":"tek satır"}
   },
-  "takipOnerisi": "görüntüleme tekrarı önerisi veya raporda yoksa standart uyarı cümlesi",
-  "doktoraSorun": ["bulguya özgü 3 soru; örn. sıvı birikimi için tedavi gerekir mi"],
+  "takipOnerisi": "hangi uzmanlık / ne sıklıkla kontrol — rapora özgü",
+  "doktoraSorun": ["bulguya özgü 3 soru; genel soru yok"],
   "yakinModu": "",
 ${KAYNAK_EKLERI_KEYS}
 }
@@ -163,6 +248,8 @@ ${yk}`;
 ${BASE}
 ${ctx}
 ${srcCtx}
+${patientBlock}
+${profileRulesGen}
 ${keGuide}
 
 ŞEMA:
@@ -183,7 +270,7 @@ ${KAYNAK_EKLERI_KEYS}
 }
 
 gunlukProgram: Yalnızca ilaç olan dilimleri doldur.
-ilaclar: TÜM satırlar.
+ilaclar: TÜM satırlar. Kronik hastalık varsa etkileşim/uyarıda dikkate al.
 
 ${yk}`;
 }

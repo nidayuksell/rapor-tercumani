@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { coerceAnalysisResult } from "@/lib/analysis";
 import { buildAnalyzeSystemPrompt } from "@/lib/prompts/analyzePrompts";
+import { parsePatientProfile, profileForPrompt } from "@/lib/validatePatientProfile";
 import type { ReaderMode, ReportSource, ReportType } from "@/lib/types";
 
 const GROQ_CHAT_URL = "https://api.groq.com/openai/v1/chat/completions";
@@ -25,6 +26,7 @@ export async function POST(req: Request) {
     source?: ReportSource;
     type?: ReportType;
     reader?: ReaderMode;
+    profile?: unknown;
   };
   try {
     body = await req.json();
@@ -40,9 +42,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Tüm seçimler gerekli" }, { status: 400 });
   }
 
-  const system = buildAnalyzeSystemPrompt(type, source, reader);
+  const profile = parsePatientProfile(body.profile, type);
+  if (!profile) {
+    return NextResponse.json(
+      { error: "Geçerli hasta profili gerekli (yaş, cinsiyet; kadında gebelik; kan tahlilinde açlık)." },
+      { status: 400 },
+    );
+  }
 
-  const userMessage = `Seçilen kaynak: ${source}. Rapor türü: ${type}. Şemaya uygun tek JSON döndür.\n\n${reportText.trim()}`;
+  const profileNorm = profileForPrompt(profile);
+  const system = buildAnalyzeSystemPrompt(type, source, reader, profileNorm);
+
+  const userMessage = `Seçilen kaynak: ${source}. Rapor türü: ${type}. Hasta profili API ile iletildi. Şemaya uygun tek JSON döndür.\n\n${reportText.trim()}`;
 
   try {
     const res = await fetch(GROQ_CHAT_URL, {
