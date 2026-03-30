@@ -1,17 +1,11 @@
-import { LogoMark } from "@/components/BrandLogo";
+import { Logo } from "@/components/Logo";
 
 export function AppFooter() {
   return (
     <footer className="bg-[#1B3A6B] text-white">
       <div className="mx-auto flex max-w-[1200px] flex-col gap-6 px-4 py-16 sm:px-6">
-        <div className="flex items-center gap-3">
-          <LogoMark size="sm" />
-          <div>
-            <p className="text-base font-semibold">Rapor Tercümanı</p>
-            <p className="text-sm text-white/75">
-              Tıbbi raporunuzu anlayın — kolayca, hızlıca, güvenle.
-            </p>
-          </div>
+        <div className="max-w-[460px] rounded-xl bg-white px-3 py-2">
+          <Logo />
         </div>
 
         <p className="max-w-3xl text-sm leading-relaxed text-white/85">

@@ -4,8 +4,8 @@ import type { ChangeEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AppFooter } from "@/components/AppFooter";
 import { AnalysisOutput } from "@/components/AnalysisOutput";
-import { LogoMark } from "@/components/BrandLogo";
 import { HeroMedicalArt } from "@/components/HeroMedicalArt";
+import { Logo } from "@/components/Logo";
 import { SelectionCard } from "@/components/SelectionCard";
 import { extractTextFromPdfFile } from "@/lib/extractPdfText";
 import {
@@ -170,6 +170,7 @@ export default function Home() {
       setError("Rapor metnini yapıştırın.");
       return;
     }
+    setResult(null);
     setError(null);
     setLoading(true);
     try {
@@ -311,7 +312,7 @@ export default function Home() {
       >
         <div className="mx-auto flex max-w-[1200px] items-center justify-between px-4 py-4 sm:px-6">
           <div className="flex items-center gap-3">
-            <LogoMark size="sm" />
+            <Logo iconOnly className="h-10 w-10" />
             <span className={`text-sm font-semibold ${navScrolled ? "text-zinc-900" : "text-white drop-shadow-sm"}`}>
               Rapor Tercümanı
             </span>
@@ -683,7 +684,15 @@ export default function Home() {
                     </div>
                   )}
                   {error && (
-                    <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>
+                    <div
+                      className={`rounded-xl px-4 py-3 text-sm ${
+                        error.startsWith("⚠️ Bu metin tıbbi bir rapor")
+                          ? "border border-amber-200 bg-amber-50 text-amber-900"
+                          : "border border-red-200 bg-red-50 text-red-800"
+                      }`}
+                    >
+                      {error}
+                    </div>
                   )}
 
                   <p className="text-sm text-zinc-500">

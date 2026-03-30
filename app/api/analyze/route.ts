@@ -12,6 +12,34 @@ type GroqChatResponse = {
   error?: { message?: string };
 };
 
+const NON_MEDICAL_ERROR =
+  "⚠️ Bu metin tıbbi bir rapor gibi görünmüyor. Lütfen kan tahlili, MR/tomografi raporu, ilaç reçetesi veya epikriz belgesi yükleyin.";
+
+async function askGroq(
+  apiKey: string,
+  messages: Array<{ role: "system" | "user"; content: string }>,
+  maxTokens = 128,
+): Promise<{ ok: boolean; content?: string; error?: string; status?: number }> {
+  const res = await fetch(GROQ_CHAT_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      messages,
+      temperature: 0,
+      max_tokens: maxTokens,
+    }),
+  });
+  const data = (await res.json()) as GroqChatResponse;
+  if (!res.ok) {
+    return { ok: false, error: data.error?.message ?? `Groq API hatası (${res.status})`, status: res.status };
+  }
+  return { ok: true, content: data.choices?.[0]?.message?.content?.trim() ?? "" };
+}
+
 export async function POST(req: Request) {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
@@ -56,31 +84,39 @@ export async function POST(req: Request) {
   const userMessage = `Seçilen kaynak: ${source}. Rapor türü: ${type}. Hasta profili API ile iletildi. Şemaya uygun tek JSON döndür.\n\n${reportText.trim()}`;
 
   try {
-    const res = await fetch(GROQ_CHAT_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: userMessage },
-        ],
-        temperature: 0.35,
-        max_tokens: 12288,
-      }),
-    });
-
-    const data = (await res.json()) as GroqChatResponse;
-
-    if (!res.ok) {
-      const msg = data.error?.message ?? `Groq API hatası (${res.status})`;
-      return NextResponse.json({ error: msg }, { status: 502 });
+    const check = await askGroq(
+      apiKey,
+      [
+        {
+          role: "system",
+          content:
+            "Is the following text a medical document (lab report, MRI/radiology report, prescription, or discharge summary)? Answer with only YES or NO.",
+        },
+        { role: "user", content: reportText.trim() },
+      ],
+      8,
+    );
+    if (!check.ok) {
+      return NextResponse.json({ error: check.error ?? "Doğrulama başarısız" }, { status: 502 });
+    }
+    const medical = (check.content ?? "").toUpperCase().includes("YES");
+    if (!medical) {
+      return NextResponse.json({ error: NON_MEDICAL_ERROR }, { status: 400 });
     }
 
-    const rawText = data.choices?.[0]?.message?.content?.trim() ?? "";
+    const analysis = await askGroq(
+      apiKey,
+      [
+        { role: "system", content: system },
+        { role: "user", content: userMessage },
+      ],
+      12288,
+    );
+    if (!analysis.ok) {
+      return NextResponse.json({ error: analysis.error ?? "Analiz başarısız" }, { status: 502 });
+    }
+
+    const rawText = analysis.content ?? "";
     const jsonMatch = rawText.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       return NextResponse.json({ error: "Model yanıtı çözümlenemedi" }, { status: 502 });
