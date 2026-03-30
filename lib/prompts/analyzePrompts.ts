@@ -127,10 +127,18 @@ function kanAbnormalRules(): string {
 
 function goruntulemeSpecificRules(): string {
   return `MR / RADYOLOJİ / GÖRÜNTÜLEME — DERİNLEMESİNE ANALİZ (GENEL "DOKTORA GİDİN" YETMEZ):
+- ÖNCE HER ZAMAN BULGUYU AÇIKLA, sonra öneri ver. Ana mesaj asla "başka hastaneye gidin" veya sadece "doktora gidin" olmasın.
 - neBulundu: Her bulgu için Türkçe, somut ve anlaşılır ifade kullan (ör. "boyun fıtığına işaret eden disk protrüzyonu", "disk yüksekliği kaybı", "sinir kökü baskısı" gibi raporda ne varsa onu adlandır). Latince/İngilizce kısaltma bırakma; sade Türkçe açıkla.
+- Minimum bağlamda bile aşağıdaki standart terimleri tanı ve sadeleştir:
+  * "diffüz bulging" => disk kabarıklığı, fıtık riski olabilir
+  * "periferik disk kabarıklığı" => erken evre disk problemi olabilir
+  * "C3-4, C4-5" (ve benzeri C/L/T seviyeleri) => omurga disk seviyeleri; C seviyeleri boyun bölgesi
+  * "protrüzyon" => disk dokusunun dışarı doğru bombeleşmesi
+  * "ekstrüzyon" => daha belirgin fıtıklaşma
+  * "daralma/stenoz" => sinir-kanal alanında sıkışma riski
 - Raporda spesifik tanı veya bulgu adı geçiyorsa: o tanının günlük hayatta ne anlama geldiğini 1-2 cümleyle açıkla (kesin teşhis koymadan, olasılık diliyle).
-- gunlukHayat: O bulgunun tipik olarak neden olabileceği günlük belirtileri yaz (ör. ağrı, uyuşma, karıncalanma, hareket kısıtlılığı, baş dönmesi — rapora uygun).
-- takipOnerisi ve onemliMi: "Hekime başvurun" demek yetmez; hangi uzmanlık dalının değerlendirmesi gerektiğini somut yaz (ör. beyin-beyin cerrahisi/nöroloji, ortopedi, fizik tedavi ve rehabilitasyon, göğüs hastalıkları, üroloji — bulguya göre).
+- gunlukHayat: O bulgunun tipik olarak neden olabileceği günlük belirtileri yaz (ör. ağrı, uyuşma, karıncalanma, hareket kısıtlılığı, güç kaybı, baş dönmesi — rapora uygun).
+- takipOnerisi ve onemliMi: "Hekime başvurun" demek yetmez; hangi uzmanlık dalının değerlendirmesi gerektiğini somut yaz (ör. nöroloji, ortopedi, fizik tedavi ve rehabilitasyon, beyin cerrahisi, göğüs hastalıkları, üroloji — bulguya göre).
 - doktoraSorun: Üç soru da bulguya ÖZEL olmalı; "değerlerim normal mi?" gibi genel sorular YASAK. Örnek üslup: "Boyun fıtığı mı var, ameliyat mı gerekir yoksa fizik tedavi yeterli olur mu?" / "Bu disk kaybı ilerleyici mi, takip aralığı ne olmalı?" — rapordaki bulguya göre uyarla.
 - Aciliyet: genel uyarı yerine bulguya dayalı gerekçe kullan.`;
 }

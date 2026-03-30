@@ -2,12 +2,12 @@
 
 import type { ChangeEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { extractTextFromPdfFile } from "@/lib/extractPdfText";
-import { AnalysisOutput } from "@/components/AnalysisOutput";
 import { AppFooter } from "@/components/AppFooter";
-import { BrandLockup } from "@/components/BrandLogo";
-import { LandingHero } from "@/components/LandingHero";
+import { AnalysisOutput } from "@/components/AnalysisOutput";
+import { LogoMark } from "@/components/BrandLogo";
+import { HeroMedicalArt } from "@/components/HeroMedicalArt";
 import { SelectionCard } from "@/components/SelectionCard";
+import { extractTextFromPdfFile } from "@/lib/extractPdfText";
 import {
   EMPTY_PATIENT_PROFILE,
   type AgeRange,
@@ -21,8 +21,6 @@ import {
   type ReportType,
   type UserSelections,
 } from "@/lib/types";
-
-type Step = "landing" | "setup" | "input" | "result";
 
 const SOURCE_OPTIONS: { value: ReportSource; label: string; hint: string }[] = [
   { value: "e-nabiz", label: "e-Nabız / SGK", hint: "Devlet ve bağlı kurum çıktıları" },
@@ -73,7 +71,6 @@ const PDF_READ_FAIL = "PDF okunamadı, metni manuel olarak yapıştırabilirsini
 const OCR_READ_FAIL = "Görsel okunamadı, metni manuel yapıştırabilirsiniz.";
 
 export default function Home() {
-  const [step, setStep] = useState<Step>("landing");
   const [selections, setSelections] = useState<UserSelections>({
     source: null,
     type: null,
@@ -84,7 +81,6 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<AnalysisResult | null>(null);
-  const [howOpen, setHowOpen] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
   const [ocrLoading, setOcrLoading] = useState(false);
@@ -95,6 +91,10 @@ export default function Home() {
   const filePickerInputRef = useRef<HTMLInputElement>(null);
   /** True ≈ phone/tablet touch — show camera + gallery buttons */
   const [isCoarsePointer, setIsCoarsePointer] = useState(false);
+  const [navScrolled, setNavScrolled] = useState(false);
+  const uploadRef = useRef<HTMLElement>(null);
+  const howRef = useRef<HTMLElement>(null);
+  const resultsRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     const mq = window.matchMedia("(pointer: coarse)");
@@ -103,6 +103,39 @@ export default function Home() {
     mq.addEventListener("change", apply);
     return () => mq.removeEventListener("change", apply);
   }, []);
+
+  useEffect(() => {
+    const onScroll = () => setNavScrolled(window.scrollY > 50);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    const nodes = Array.from(document.querySelectorAll<HTMLElement>("[data-fade]"));
+    if (nodes.length === 0) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting) {
+            e.target.classList.add("is-visible");
+            io.unobserve(e.target);
+          }
+        }
+      },
+      { threshold: 0.12, rootMargin: "0px 0px -60px 0px" },
+    );
+    nodes.forEach((n) => io.observe(n));
+    return () => io.disconnect();
+  }, []);
+
+  function scrollToUpload() {
+    uploadRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function scrollToHow() {
+    howRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 
   const selectionsComplete = useMemo(() => {
     const { source, type, reader, profile } = selections;
@@ -158,7 +191,7 @@ export default function Home() {
       }
       if (data.result) {
         setResult(data.result);
-        setStep("result");
+        setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 120);
       }
     } catch {
       setError("Bağlantı hatası. Tekrar deneyin.");
@@ -268,266 +301,160 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen border-t-[3px] border-[#1B3A6B] bg-white">
-      <header className="sticky top-0 z-30 border-b border-zinc-100/90 bg-white/95 shadow-[0_1px_0_rgba(27,58,107,0.04)] backdrop-blur-md">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3.5 sm:px-6">
-          <BrandLockup size="md" />
-          {step !== "landing" && (
+    <div className="min-h-screen bg-white">
+      <header
+        className={`fixed inset-x-0 top-0 z-50 transition-all duration-300 ${
+          navScrolled
+            ? "border-b border-zinc-200 bg-white/96 shadow-sm backdrop-blur-md"
+            : "bg-transparent"
+        }`}
+      >
+        <div className="mx-auto flex max-w-[1200px] items-center justify-between px-4 py-4 sm:px-6">
+          <div className="flex items-center gap-3">
+            <LogoMark size="sm" />
+            <span className={`text-sm font-semibold ${navScrolled ? "text-zinc-900" : "text-white drop-shadow-sm"}`}>
+              Rapor Tercümanı
+            </span>
+          </div>
+          <nav className="flex items-center gap-5">
             <button
               type="button"
-              onClick={() => {
-                setStep("landing");
-                setResult(null);
-                setReportText("");
-                setSelections({
-                  source: null,
-                  type: null,
-                  reader: null,
-                  profile: { ...EMPTY_PATIENT_PROFILE },
-                });
-                setError(null);
-                setPdfError(null);
-                setOcrError(null);
-              }}
-              className="shrink-0 text-sm font-semibold text-[#1B3A6B] underline-offset-4 hover:underline"
+              onClick={scrollToHow}
+              className={`text-sm font-medium transition-colors ${
+                navScrolled ? "text-zinc-700 hover:text-[#F97316]" : "text-white hover:text-orange-200"
+              }`}
             >
-              Başa dön
+              Nasıl Çalışır
             </button>
-          )}
+            <button
+              type="button"
+              onClick={scrollToUpload}
+              className="rounded-xl bg-[#1B3A6B] px-4 py-2 text-sm font-semibold text-white transition-colors duration-200 hover:bg-[#F97316]"
+            >
+              Raporu Yükle
+            </button>
+          </nav>
         </div>
       </header>
 
-      {step === "landing" && <LandingHero />}
-
-      {step === "landing" && (
-        <div className="flex justify-center border-b border-zinc-100/80 bg-white py-3">
-          <a
-            href="#devam"
-            className="inline-flex items-center gap-2 text-sm font-semibold text-[#1B3A6B] underline-offset-4 hover:underline"
-          >
-            Forma geç
-            <span className="inline-block text-base animate-bounce" aria-hidden>
-              ↓
-            </span>
-          </a>
-        </div>
-      )}
-
-      <main
-        id="devam"
-        className="mx-auto max-w-3xl scroll-mt-24 px-4 pb-20 pt-10 sm:px-6 sm:pt-12"
-      >
-        {step === "landing" && (
-          <div className="space-y-8 text-center">
-            <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-              <button
-                type="button"
-                onClick={() => setStep("setup")}
-                className="w-full max-w-xs rounded-2xl px-8 py-3.5 text-base font-bold text-white shadow-clinical-card transition hover:brightness-110 sm:w-auto"
-                style={{ backgroundColor: "#1B3A6B" }}
-              >
-                Başla
-              </button>
-              <button
-                type="button"
-                onClick={() => setHowOpen((v) => !v)}
-                className="w-full max-w-xs rounded-2xl border-2 border-zinc-200 bg-white px-6 py-3 text-sm font-bold text-[#1B3A6B] shadow-clinical-card transition hover:border-[#1B3A6B]/30 hover:bg-zinc-50/80 sm:w-auto"
-              >
-                Nasıl Çalışır?
-              </button>
-            </div>
-
-            {howOpen && (
-              <div className="mx-auto max-w-lg rounded-2xl border border-zinc-100 bg-zinc-50/90 p-5 text-left text-sm leading-relaxed text-zinc-700 shadow-clinical-card">
-                <ol className="list-decimal space-y-2 pl-5">
-                  <li>Kaynak, rapor türü, okuyucu modu ve sizin hakkınızda bilgileri seçin.</li>
-                  <li>Rapor metnini yapıştırıp analizi başlatın.</li>
-                  <li>
-                    Aciliyet skoru ve sade Türkçe özet görünür. Son karar her zaman hekiminizedir.
-                  </li>
-                </ol>
-                <p className="mt-4 text-xs text-zinc-500">
-                  Bu uygulama tıbbi tavsiye vermez; yalnızca metni daha anlaşılır hale getirmeye yardımcı
-                  olur.
-                </p>
+      <main className="pt-20">
+        <section className="bg-white py-20">
+          <div className="mx-auto grid max-w-[1200px] gap-12 px-4 sm:px-6 lg:grid-cols-2 lg:items-center">
+            <div data-fade className="fade-on-scroll">
+              <h1 className="text-[38px] font-extrabold leading-[1.1] tracking-tight text-zinc-900 sm:text-[52px]">
+                Tıbbi raporunuzu anlamak artık çok kolay
+              </h1>
+              <p className="mt-6 text-[18px] font-normal leading-relaxed text-zinc-500">
+                Kan tahlilinden epikrize, MR raporundan reçeteye — yapay zeka destekli Rapor
+                Tercümanı her belgeyi sizin için sade Türkçeye çeviriyor.
+              </p>
+              <div className="mt-8 flex flex-wrap gap-3">
+                {[
+                  "🔒 Verileriniz saklanmaz",
+                  "⚡ Saniyeler içinde sonuç",
+                  "🇹🇷 Türk sağlık sistemine özel",
+                ].map((x) => (
+                  <span
+                    key={x}
+                    className="rounded-2xl border border-[#E5E7EB] bg-[#F8FAFC] px-4 py-2 text-sm text-zinc-700 shadow-[0_1px_3px_rgba(0,0,0,0.06)]"
+                  >
+                    {x}
+                  </span>
+                ))}
               </div>
-            )}
+              <div className="mt-8">
+                <button
+                  type="button"
+                  onClick={scrollToUpload}
+                  className="rounded-xl bg-[#1B3A6B] px-6 py-3.5 text-base font-semibold text-white transition-colors duration-200 hover:bg-[#F97316]"
+                >
+                  Raporu Yükle →
+                </button>
+              </div>
+            </div>
+            <div data-fade className="fade-on-scroll">
+              <HeroMedicalArt />
+            </div>
           </div>
-        )}
+        </section>
 
-        {step === "setup" && (
-          <div className="space-y-10">
-            <div>
-              <h2 className="border-l-[3px] border-[#1B3A6B] pl-3 text-xl font-bold tracking-tight text-zinc-900">
-                Adım 1 / 2 — Seçimler
+        <section className="bg-[#F8FAFC] py-20">
+          <div className="mx-auto max-w-[1200px] px-4 sm:px-6">
+            <div data-fade className="fade-on-scroll">
+              <h2 className="mb-12 text-[32px] font-bold tracking-tight text-zinc-900">
+                Tıbbi raporlar neden bu kadar zor?
               </h2>
-              <p className="mt-2 text-sm leading-relaxed text-zinc-600">
-                Bu bilgiler açıklamanın tonunu ve bağlamını iyileştirir.
-              </p>
+              <div className="grid gap-6 md:grid-cols-3">
+                {[
+                  ["Karmaşık terimler", "Doktor raporlarında teknik dil ve kısaltmalar günlük dilde anlaşılmayabilir."],
+                  ["Zaman baskısı", "Muayene sırasında tüm detayları sormak ve not etmek çoğu zaman mümkün olmuyor."],
+                  ["Belirsizlik", "Hangi değer normal, hangi bulgu önemli; hasta için ayrımı yapmak zorlaşıyor."],
+                ].map(([t, d]) => (
+                  <article
+                    key={t}
+                    className="rounded-2xl border border-[#E5E7EB] bg-[#F8FAFC] px-7 py-6 shadow-[0_1px_3px_rgba(0,0,0,0.06)]"
+                  >
+                    <h3 className="text-[20px] font-semibold text-[#1B3A6B]">{t}</h3>
+                    <p className="mt-4 text-[16px] leading-relaxed text-zinc-600">{d}</p>
+                  </article>
+                ))}
+              </div>
             </div>
+          </div>
+        </section>
 
-            <section className="space-y-3">
-              <h3 className="text-sm font-bold uppercase tracking-wide text-[#1B3A6B]">
-                A) Rapor kaynağı
-              </h3>
-              <div className="grid gap-3 sm:grid-cols-3">
-                {SOURCE_OPTIONS.map((opt) => {
-                  const active = selections.source === opt.value;
-                  return (
-                    <SelectionCard
-                      key={opt.value}
-                      active={active}
-                      onClick={() => setSelections((s) => ({ ...s, source: opt.value }))}
-                    >
-                      <p className="font-bold text-zinc-900">{opt.label}</p>
-                      <p className="mt-1 text-xs text-zinc-500">{opt.hint}</p>
-                    </SelectionCard>
-                  );
-                })}
+        <section id="how" ref={howRef} className="bg-white py-20">
+          <div className="mx-auto max-w-[1200px] px-4 sm:px-6">
+            <div data-fade className="fade-on-scroll">
+              <h2 className="mb-12 text-[32px] font-bold tracking-tight text-zinc-900">Nasıl Çalışır?</h2>
+              <div className="grid gap-6 md:grid-cols-3">
+                {[
+                  ["1", "Raporunu yükle veya yapıştır"],
+                  ["2", "Rapor türünü seç"],
+                  ["3", "Sade Türkçe analiz al"],
+                ].map(([n, t]) => (
+                  <div
+                    key={n}
+                    className="rounded-2xl border border-[#E5E7EB] bg-[#F8FAFC] px-7 py-6 shadow-[0_1px_3px_rgba(0,0,0,0.06)]"
+                  >
+                    <p className="text-3xl font-bold text-[#1B3A6B]">{n}</p>
+                    <p className="mt-4 text-[18px] font-normal text-zinc-700">{t}</p>
+                  </div>
+                ))}
               </div>
-            </section>
+            </div>
+          </div>
+        </section>
 
-            <section className="space-y-3">
-              <h3 className="text-sm font-bold uppercase tracking-wide text-[#1B3A6B]">
-                B) Rapor türü
-              </h3>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {TYPE_OPTIONS.map((opt) => {
-                  const active = selections.type === opt.value;
-                  return (
-                    <SelectionCard
-                      key={opt.value}
-                      active={active}
-                      onClick={() =>
-                        setSelections((s) => ({
-                          ...s,
-                          type: opt.value,
-                          profile: {
-                            ...s.profile,
-                            fasting: opt.value === "kan" ? s.profile.fasting : null,
-                          },
-                        }))
-                      }
-                    >
-                      <p className="text-2xl leading-none">{opt.emoji}</p>
-                      <p className="mt-2 text-sm font-bold text-zinc-900">{opt.label}</p>
-                    </SelectionCard>
-                  );
-                })}
-              </div>
-            </section>
-
-            <section className="space-y-3">
-              <h3 className="text-sm font-bold uppercase tracking-wide text-[#1B3A6B]">
-                C) Kim için? (Aile / bakıcı modu)
-              </h3>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {READER_OPTIONS.map((opt) => {
-                  const active = selections.reader === opt.value;
-                  return (
-                    <SelectionCard
-                      key={opt.value}
-                      active={active}
-                      onClick={() => setSelections((s) => ({ ...s, reader: opt.value }))}
-                    >
-                      <p className="font-bold text-zinc-900">{opt.label}</p>
-                      <p className="mt-1 text-xs text-zinc-500">{opt.hint}</p>
-                    </SelectionCard>
-                  );
-                })}
-              </div>
-            </section>
-
-            <section className="space-y-4">
-              <h3 className="text-sm font-bold uppercase tracking-wide text-[#1B3A6B]">
-                👤 Sizin Hakkınızda
-              </h3>
-              <p className="text-xs leading-relaxed text-zinc-600">
-                Referans aralığı yorumunu doğrulamak için kullanılır; isteğe bağlı alanlar açıkça
-                işaretlidir.
-              </p>
-
-              <div className="space-y-2">
-                <p className="text-xs font-semibold text-zinc-700">Yaş aralığı</p>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  {AGE_OPTIONS.map((opt) => {
-                    const active = selections.profile.ageRange === opt.value;
-                    return (
-                      <SelectionCard
-                        key={opt.value}
-                        active={active}
-                        onClick={() =>
-                          setSelections((s) => ({
-                            ...s,
-                            profile: { ...s.profile, ageRange: opt.value },
-                          }))
-                        }
-                      >
-                        <p className="text-sm font-bold text-zinc-900">{opt.label}</p>
-                      </SelectionCard>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <p className="text-xs font-semibold text-zinc-700">Cinsiyet</p>
-                <div className="grid grid-cols-2 gap-3">
-                  {GENDER_OPTIONS.map((opt) => {
-                    const active = selections.profile.gender === opt.value;
-                    return (
-                      <SelectionCard
-                        key={opt.value}
-                        active={active}
-                        onClick={() =>
-                          setSelections((s) => ({
-                            ...s,
-                            profile: {
-                              ...s.profile,
-                              gender: opt.value,
-                              pregnancy: opt.value === "erkek" ? null : s.profile.pregnancy,
-                            },
-                          }))
-                        }
-                      >
-                        <p className="font-bold text-zinc-900">{opt.label}</p>
-                      </SelectionCard>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {selections.profile.gender === "kadin" && (
-                <div className="space-y-2">
-                  <p className="text-xs font-semibold text-zinc-700">Gebelik</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    {PREGNANCY_OPTIONS.map((opt) => {
-                      const active = selections.profile.pregnancy === opt.value;
+        <section id="upload" ref={uploadRef} className="bg-[#F8FAFC] py-20">
+          <div className="mx-auto max-w-[1200px] px-4 sm:px-6">
+            <div data-fade className="fade-on-scroll rounded-2xl border border-[#E5E7EB] bg-[#F8FAFC] px-7 py-8 shadow-[0_1px_3px_rgba(0,0,0,0.06)] sm:px-8">
+              <h2 className="mb-12 text-[32px] font-bold tracking-tight text-zinc-900">Raporunu Analiz Et</h2>
+              <div className="space-y-8">
+                <section className="space-y-4">
+                  <h3 className="text-[20px] font-semibold text-[#1B3A6B]">Rapor kaynağı</h3>
+                  <div className="grid gap-4 sm:grid-cols-3">
+                    {SOURCE_OPTIONS.map((opt) => {
+                      const active = selections.source === opt.value;
                       return (
                         <SelectionCard
                           key={opt.value}
                           active={active}
-                          onClick={() =>
-                            setSelections((s) => ({
-                              ...s,
-                              profile: { ...s.profile, pregnancy: opt.value },
-                            }))
-                          }
+                          onClick={() => setSelections((s) => ({ ...s, source: opt.value }))}
                         >
                           <p className="font-bold text-zinc-900">{opt.label}</p>
+                          <p className="mt-1 text-sm text-zinc-500">{opt.hint}</p>
                         </SelectionCard>
                       );
                     })}
                   </div>
-                </div>
-              )}
+                </section>
 
-              {selections.type === "kan" && (
-                <div className="space-y-2">
-                  <p className="text-xs font-semibold text-zinc-700">Tahlil açlık durumu</p>
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    {FASTING_OPTIONS.map((opt) => {
-                      const active = selections.profile.fasting === opt.value;
+                <section className="space-y-4">
+                  <h3 className="text-[20px] font-semibold text-[#1B3A6B]">Rapor türü</h3>
+                  <div className="grid gap-4 sm:grid-cols-4">
+                    {TYPE_OPTIONS.map((opt) => {
+                      const active = selections.type === opt.value;
                       return (
                         <SelectionCard
                           key={opt.value}
@@ -535,193 +462,277 @@ export default function Home() {
                           onClick={() =>
                             setSelections((s) => ({
                               ...s,
-                              profile: { ...s.profile, fasting: opt.value },
+                              type: opt.value,
+                              profile: { ...s.profile, fasting: opt.value === "kan" ? s.profile.fasting : null },
+                            }))
+                          }
+                        >
+                          <p className="text-2xl">{opt.emoji}</p>
+                          <p className="mt-2 text-sm font-bold text-zinc-900">{opt.label}</p>
+                        </SelectionCard>
+                      );
+                    })}
+                  </div>
+                </section>
+
+                <section className="space-y-4">
+                  <h3 className="text-[20px] font-semibold text-[#1B3A6B]">Kim için?</h3>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {READER_OPTIONS.map((opt) => {
+                      const active = selections.reader === opt.value;
+                      return (
+                        <SelectionCard
+                          key={opt.value}
+                          active={active}
+                          onClick={() => setSelections((s) => ({ ...s, reader: opt.value }))}
+                        >
+                          <p className="font-bold text-zinc-900">{opt.label}</p>
+                          <p className="mt-1 text-sm text-zinc-500">{opt.hint}</p>
+                        </SelectionCard>
+                      );
+                    })}
+                  </div>
+                </section>
+
+                <section className="space-y-4">
+                  <h3 className="text-[20px] font-semibold text-[#1B3A6B]">👤 Sizin Hakkınızda</h3>
+                  <div className="space-y-3">
+                    <p className="text-sm font-semibold text-zinc-700">Yaş aralığı</p>
+                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                      {AGE_OPTIONS.map((opt) => (
+                        <SelectionCard
+                          key={opt.value}
+                          active={selections.profile.ageRange === opt.value}
+                          onClick={() =>
+                            setSelections((s) => ({
+                              ...s,
+                              profile: { ...s.profile, ageRange: opt.value },
                             }))
                           }
                         >
                           <p className="text-sm font-bold text-zinc-900">{opt.label}</p>
                         </SelectionCard>
-                      );
-                    })}
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
 
-              <div className="space-y-2">
-                <label
-                  htmlFor="chronic-conditions"
-                  className="text-xs font-semibold text-zinc-700"
-                >
-                  Bilinen kronik hastalığınız varsa yazın{" "}
-                  <span className="font-normal text-zinc-500">(opsiyonel)</span>
-                </label>
-                <input
-                  id="chronic-conditions"
-                  type="text"
-                  value={selections.profile.chronicConditions}
-                  onChange={(e) =>
-                    setSelections((s) => ({
-                      ...s,
-                      profile: { ...s.profile, chronicConditions: e.target.value },
-                    }))
-                  }
-                  placeholder="Örn: Tip 2 diyabet, hipertansiyon, hipotiroidi..."
-                  className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 shadow-sm placeholder:text-zinc-400 focus:border-[#1B3A6B] focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]/20"
-                  autoComplete="off"
-                />
-              </div>
-            </section>
+                  <div className="space-y-3">
+                    <p className="text-sm font-semibold text-zinc-700">Cinsiyet</p>
+                    <div className="grid grid-cols-2 gap-4">
+                      {GENDER_OPTIONS.map((opt) => (
+                        <SelectionCard
+                          key={opt.value}
+                          active={selections.profile.gender === opt.value}
+                          onClick={() =>
+                            setSelections((s) => ({
+                              ...s,
+                              profile: {
+                                ...s.profile,
+                                gender: opt.value,
+                                pregnancy: opt.value === "erkek" ? null : s.profile.pregnancy,
+                              },
+                            }))
+                          }
+                        >
+                          <p className="font-bold text-zinc-900">{opt.label}</p>
+                        </SelectionCard>
+                      ))}
+                    </div>
+                  </div>
 
-            <button
-              type="button"
-              disabled={!selectionsComplete}
-              onClick={() => setStep("input")}
-              className="w-full rounded-2xl py-3.5 text-base font-bold text-white shadow-clinical-card transition enabled:hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
-              style={{ backgroundColor: "#1B3A6B" }}
-            >
-              Devam et
-            </button>
-          </div>
-        )}
+                  {selections.profile.gender === "kadin" && (
+                    <div className="space-y-3">
+                      <p className="text-sm font-semibold text-zinc-700">Gebelik</p>
+                      <div className="grid grid-cols-2 gap-4">
+                        {PREGNANCY_OPTIONS.map((opt) => (
+                          <SelectionCard
+                            key={opt.value}
+                            active={selections.profile.pregnancy === opt.value}
+                            onClick={() =>
+                              setSelections((s) => ({
+                                ...s,
+                                profile: { ...s.profile, pregnancy: opt.value },
+                              }))
+                            }
+                          >
+                            <p className="font-bold text-zinc-900">{opt.label}</p>
+                          </SelectionCard>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
-        {step === "input" && (
-          <div className="space-y-6">
-            <div>
-              <h2 className="border-l-[3px] border-[#1B3A6B] pl-3 text-xl font-bold tracking-tight text-zinc-900">
-                Adım 2 / 2 — Rapor metni
-              </h2>
-              <p className="mt-2 text-sm leading-relaxed text-zinc-600">
-                Kişisel verileri paylaşmadan önce gerekirse maskeleyebilirsiniz.
-              </p>
-            </div>
+                  {selections.type === "kan" && (
+                    <div className="space-y-3">
+                      <p className="text-sm font-semibold text-zinc-700">Açlık durumu</p>
+                      <div className="grid gap-4 sm:grid-cols-3">
+                        {FASTING_OPTIONS.map((opt) => (
+                          <SelectionCard
+                            key={opt.value}
+                            active={selections.profile.fasting === opt.value}
+                            onClick={() =>
+                              setSelections((s) => ({
+                                ...s,
+                                profile: { ...s.profile, fasting: opt.value },
+                              }))
+                            }
+                          >
+                            <p className="text-sm font-bold text-zinc-900">{opt.label}</p>
+                          </SelectionCard>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
-              <textarea
-                value={reportText}
-                onChange={(e) => {
-                  setPdfError(null);
-                  setOcrError(null);
-                  setReportText(e.target.value);
-                }}
-                placeholder="Rapor metnini buraya yapıştırın..."
-                rows={14}
-                className="min-h-[280px] w-full flex-1 resize-y rounded-2xl border border-zinc-200 bg-zinc-50/50 p-4 text-base leading-relaxed text-zinc-900 shadow-clinical-card placeholder:text-zinc-400 focus:border-[#1B3A6B] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]/25 sm:min-h-0"
-              />
+                  <div className="space-y-2">
+                    <label htmlFor="chronic-conditions" className="text-sm font-semibold text-zinc-700">
+                      Bilinen kronik hastalığınız varsa yazın (opsiyonel)
+                    </label>
+                    <input
+                      id="chronic-conditions"
+                      type="text"
+                      value={selections.profile.chronicConditions}
+                      onChange={(e) =>
+                        setSelections((s) => ({
+                          ...s,
+                          profile: { ...s.profile, chronicConditions: e.target.value },
+                        }))
+                      }
+                      placeholder="Örn: Tip 2 diyabet, hipertansiyon, hipotiroidi..."
+                      className="w-full rounded-xl border border-[#E5E7EB] bg-white px-4 py-3 text-base text-zinc-900 placeholder:text-zinc-400 focus:border-[#1B3A6B] focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]/20"
+                    />
+                  </div>
+                </section>
 
-              <div className="flex shrink-0 flex-col gap-2 sm:w-48 sm:pt-1">
-                <input
-                  ref={cameraInputRef}
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  className="hidden"
-                  onChange={handleCameraInputChange}
-                />
-                <input
-                  ref={filePickerInputRef}
-                  type="file"
-                  accept="image/*,.pdf,.jpg,.jpeg,.png,.webp,application/pdf"
-                  className="hidden"
-                  onChange={handleFilePickerChange}
-                />
-                {isCoarsePointer ? (
-                  <>
-                    <button
-                      type="button"
-                      disabled={pdfLoading || ocrLoading || loading}
-                      onClick={() => cameraInputRef.current?.click()}
-                      className="rounded-2xl border-2 border-[#1B3A6B] bg-white px-4 py-3 text-sm font-bold text-[#1B3A6B] shadow-clinical-card transition hover:bg-[#1B3A6B]/5 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      📷 Fotoğraf Çek
-                    </button>
-                    <button
-                      type="button"
-                      disabled={pdfLoading || ocrLoading || loading}
-                      onClick={() => filePickerInputRef.current?.click()}
-                      className="rounded-2xl border-2 border-[#1B3A6B] bg-white px-4 py-3 text-sm font-bold leading-snug text-[#1B3A6B] shadow-clinical-card transition hover:bg-[#1B3A6B]/5 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      🖼️ Galeriden / Dosyadan Seç
-                    </button>
-                  </>
-                ) : (
+                <section className="space-y-4">
+                  <h3 className="text-[20px] font-semibold text-[#1B3A6B]">Rapor metni / dosya</h3>
+                  <div className="flex flex-col gap-4 lg:flex-row">
+                    <textarea
+                      value={reportText}
+                      onChange={(e) => {
+                        setPdfError(null);
+                        setOcrError(null);
+                        setReportText(e.target.value);
+                      }}
+                      placeholder={
+                        "Rapor metnini buraya yapıştırın...\n\n💡 İpucu: Raporun tamamını yapıştırmak daha doğru ve kapsamlı sonuç almanızı sağlar."
+                      }
+                      rows={14}
+                      className="min-h-[280px] w-full resize-y rounded-2xl border border-[#E5E7EB] bg-white p-5 text-[16px] leading-relaxed text-zinc-900 placeholder:text-zinc-400 focus:border-[#1B3A6B] focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]/20"
+                    />
+
+                    <div className="flex shrink-0 flex-col gap-3 lg:w-60">
+                      <input
+                        ref={cameraInputRef}
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        className="hidden"
+                        onChange={handleCameraInputChange}
+                      />
+                      <input
+                        ref={filePickerInputRef}
+                        type="file"
+                        accept="image/*,.pdf,.jpg,.jpeg,.png,.webp,application/pdf"
+                        className="hidden"
+                        onChange={handleFilePickerChange}
+                      />
+                      {isCoarsePointer ? (
+                        <>
+                          <button
+                            type="button"
+                            disabled={pdfLoading || ocrLoading || loading}
+                            onClick={() => cameraInputRef.current?.click()}
+                            className="rounded-xl bg-[#1B3A6B] px-5 py-3 text-sm font-semibold text-white transition-colors duration-200 hover:bg-[#F97316] disabled:opacity-50"
+                          >
+                            📷 Fotoğraf Çek
+                          </button>
+                          <button
+                            type="button"
+                            disabled={pdfLoading || ocrLoading || loading}
+                            onClick={() => filePickerInputRef.current?.click()}
+                            className="rounded-xl bg-[#1B3A6B] px-5 py-3 text-sm font-semibold text-white transition-colors duration-200 hover:bg-[#F97316] disabled:opacity-50"
+                          >
+                            🖼️ Galeriden / Dosyadan Seç
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={pdfLoading || ocrLoading || loading}
+                          onClick={() => filePickerInputRef.current?.click()}
+                          className="rounded-xl bg-[#1B3A6B] px-5 py-3 text-sm font-semibold text-white transition-colors duration-200 hover:bg-[#F97316] disabled:opacity-50"
+                        >
+                          Görsel veya PDF Yükle
+                        </button>
+                      )}
+                      {(pdfLoading || ocrLoading) && (
+                        <p className="text-sm text-zinc-600">{pdfLoading ? "PDF okunuyor..." : "Rapor okunuyor..."}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {pdfError && (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                      {pdfError}
+                    </div>
+                  )}
+                  {ocrError && (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                      {ocrError}
+                    </div>
+                  )}
+                  {error && (
+                    <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>
+                  )}
+
+                  <p className="text-sm text-zinc-500">
+                    💡 İpucu: Raporun tamamını yapıştırmak daha doğru ve kapsamlı sonuç almanızı sağlar.
+                  </p>
                   <button
                     type="button"
-                    disabled={pdfLoading || ocrLoading || loading}
-                    onClick={() => filePickerInputRef.current?.click()}
-                    className="rounded-2xl border-2 border-[#1B3A6B] bg-white px-4 py-3 text-sm font-bold leading-snug text-[#1B3A6B] shadow-clinical-card transition hover:bg-[#1B3A6B]/5 disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={loading || !reportText.trim() || !selectionsComplete}
+                    onClick={analyze}
+                    className={`rounded-xl px-6 py-3.5 text-base font-semibold text-white transition-colors duration-200 ${
+                      loading ? "animate-cta-loading bg-[#1B3A6B]" : "bg-[#1B3A6B] hover:bg-[#F97316]"
+                    } disabled:cursor-not-allowed disabled:opacity-45`}
                   >
-                    Görsel veya PDF Yükle
+                    {loading ? "Analiz ediliyor…" : "Analiz Et"}
                   </button>
-                )}
-                {(pdfLoading || ocrLoading) && (
-                  <p className="text-center text-sm font-medium text-zinc-600 sm:text-left">
-                    {pdfLoading ? "PDF okunuyor..." : "Rapor okunuyor..."}
-                  </p>
-                )}
+                </section>
               </div>
             </div>
-
-            {pdfError && (
-              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-clinical-card">
-                {pdfError}
-              </div>
-            )}
-
-            {ocrError && (
-              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-clinical-card">
-                {ocrError}
-              </div>
-            )}
-
-            {error && (
-              <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-800 shadow-clinical-card">
-                {error}
-              </div>
-            )}
-
-            <button
-              type="button"
-              disabled={loading || !reportText.trim()}
-              onClick={analyze}
-              className={`w-full rounded-2xl py-4 text-lg font-bold text-white transition enabled:hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 ${
-                loading ? "animate-cta-loading" : "shadow-clinical-card"
-              }`}
-              style={{ backgroundColor: "#1B3A6B" }}
-            >
-              {loading ? "Analiz ediliyor…" : "Analiz Et"}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setStep("setup")}
-              className="text-sm font-medium text-zinc-500 underline-offset-4 hover:text-[#1B3A6B] hover:underline"
-            >
-              ← Seçimlere dön
-            </button>
           </div>
-        )}
+        </section>
 
-        {step === "result" &&
-          result &&
-          selections.reader &&
-          selections.type &&
-          selections.source && (
-          <AnalysisOutput
-            result={result}
-            reportType={selections.type}
-            source={selections.source}
-            readerMode={selections.reader}
-            onNewReport={() => {
-              setResult(null);
-              setReportText("");
-              setStep("input");
-            }}
-            onChangeSelections={() => {
-              setResult(null);
-              setStep("setup");
-            }}
-          />
-        )}
+        <section id="results" ref={resultsRef} className="bg-white py-20">
+          <div className="mx-auto max-w-[1200px] px-4 sm:px-6">
+            <div data-fade className={`fade-on-scroll ${result ? "is-visible animate-result-enter" : ""}`}>
+              <h2 className="mb-12 text-[32px] font-bold tracking-tight text-zinc-900">Sonuçlar</h2>
+              {result && selections.reader && selections.type && selections.source ? (
+                <AnalysisOutput
+                  result={result}
+                  reportType={selections.type}
+                  source={selections.source}
+                  readerMode={selections.reader}
+                  onNewReport={() => {
+                    setResult(null);
+                    setReportText("");
+                    scrollToUpload();
+                  }}
+                  onChangeSelections={() => {
+                    setResult(null);
+                    scrollToUpload();
+                  }}
+                />
+              ) : (
+                <div className="rounded-2xl border border-[#E5E7EB] bg-[#F8FAFC] px-7 py-10 text-[16px] text-zinc-600 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
+                  Analiz sonuçları burada görünecek. Önce raporunuzu yükleyip <strong>Analiz Et</strong> butonuna basın.
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
       </main>
 
       <AppFooter />

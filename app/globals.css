@@ -67,3 +67,16 @@ body {
 .shadow-clinical-card-hover:hover {
   box-shadow: var(--shadow-card-hover);
 }
+
+.fade-on-scroll {
+  opacity: 0;
+  transform: translateY(18px);
+  transition:
+    opacity 0.65s ease,
+    transform 0.65s ease;
+}
+
+.fade-on-scroll.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
