@@ -6,7 +6,7 @@ Tıbbi raporunuzu anlayın — kolayca, hızlıca, güvenle.
 Türkiye'de hastalar ellerindeki tıbbi raporları, laboratuvar sonuçlarını ve epikriz belgelerini anlamakta ciddi güçlük çekiyor. Karmaşık tıbbi terimler ve Latince ifadeler hastaları bunaltıyor. Doktora soru sormaktan çekinen ya da raporu yanlış yorumlayan hastalar yanlış kararlara yönelebiliyor.
 
 ## Çözüm
-Rapor Tercümanı, yapay zeka destekli bir tıbbi rapor açıklama aracıdır. Kullanıcı raporunu yapıştırır, yükler veya fotoğrafını çeker — AI raporu analiz ederek sade Türkçeyle açıklar, aciliyet skorunu belirler ve doktora sorulacak soruları önerir.
+Rapor Tercümanı, yapay zeka destekli bir tıbbi rapor açıklama aracıdır. Kullanıcı raporunu yapıştırır, yükler veya fotoğrafını çeker. AI raporu analiz ederek sade Türkçeyle açıklar, aciliyet skorunu belirler ve doktora sorulacak soruları önerir.
 
 ## Canlı Demo
 - 🌐 Yayın Linki: https://rapor-tercumani.vercel.app
