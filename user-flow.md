@@ -38,7 +38,7 @@ Kullanıcı üç yöntemden biriyle raporu sisteme girer:
 
 ## Adım 7: Analiz
 "Analiz Et" butonuna basar.
-"Raporunuz analiz ediliyor..." yükleme ekranı görünür.
+"Analiz ediliyor..." görünür.
 Groq API (llama-3.3-70b-versatile) raporu analiz eder.
 
 ## Adım 8: Sonuçları Görüntüleme
