@@ -304,16 +304,16 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-white">
       <header
-        className={`fixed inset-x-0 top-0 z-50 transition-all duration-300 ${
+        className={`navbar fixed inset-x-0 top-0 z-[100] w-full transition-[background-color,box-shadow,border-color] duration-300 ease-in-out ${
           navScrolled
-            ? "border-b border-zinc-200 bg-white/96 shadow-sm backdrop-blur-md"
+            ? "scrolled border-b border-zinc-200 bg-white shadow-sm"
             : "bg-transparent"
         }`}
       >
         <div className="mx-auto flex max-w-[1200px] items-center justify-between px-4 py-4 sm:px-6">
-          <div className="flex items-center gap-3">
+          <div className="logo flex items-center gap-3">
             <Logo iconOnly className="h-10 w-10" />
-            <span className={`text-sm font-semibold ${navScrolled ? "text-zinc-900" : "text-white drop-shadow-sm"}`}>
+            <span className="text-sm font-bold text-black transition-colors duration-300">
               Rapor Tercümanı
             </span>
           </div>
@@ -321,9 +321,7 @@ export default function Home() {
             <button
               type="button"
               onClick={scrollToHow}
-              className={`text-sm font-medium transition-colors ${
-                navScrolled ? "text-zinc-700 hover:text-[#F97316]" : "text-white hover:text-orange-200"
-              }`}
+              className="text-sm font-medium text-zinc-900 transition-colors duration-300 hover:text-[#F97316]"
             >
               Nasıl Çalışır
             </button>
