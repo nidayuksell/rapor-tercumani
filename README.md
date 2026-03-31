@@ -10,7 +10,7 @@ Rapor Tercümanı, yapay zeka destekli bir tıbbi rapor açıklama aracıdır. K
 
 ## Canlı Demo
 - 🌐 Yayın Linki: https://rapor-tercumani.vercel.app
-- 🎥 Demo Video: (yakında eklenecek)
+- 🎥 Demo Video: https://youtu.be/cvuAbziWl6M?si=8A2fnimYO923w9mS
 
 ## Özellikler
 - 🩸 Kan tahlili, MR, epikriz ve ilaç reçetesi analizi
